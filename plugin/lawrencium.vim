@@ -302,7 +302,7 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
         echom " - matched command"
         return filter(keys(g:lawrencium_hg_commands), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
     endif
-    
+
     " Try completing a command's options.
     let l:cmd = matchstr(a:CmdLine, '\v(^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*)@<=[a-zA-Z]+')
     if strlen(l:cmd) > 0
@@ -316,7 +316,7 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
             return l:copts + l:gopts
         endif
     endif
-    
+
     " Just auto-complete with filenames unless it's an option.
     if l:arglead[0] ==# '-'
         return []
@@ -348,11 +348,11 @@ function! s:HgStatus() abort
     wincmd p
     call append(0, l:status_lines)
     call cursor(1, 1)
-    " Make it a nice size. 
+    " Make it a nice size.
     execute "setlocal previewheight=" . l:preview_height
     " Make sure it's deleted when we exit the window.
     setlocal bufhidden=delete
-    
+
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it.
     let b:mercurial_dir = l:repo.root_dir
@@ -416,7 +416,7 @@ endfunction
 function! s:HgStatus_FileEdit() abort
     " Get the path of the file the cursor is on.
     let l:filename = s:HgStatus_GetSelectedFile()
-   
+
     " If the file is already open in a window, jump to that window.
     " Otherwise, jump to the previous window and open it there.
     for nr in range(1, winnr('$'))
@@ -527,8 +527,8 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedi
 " Hgdiff {{{
 
 function! s:HgDiff(filename, vertical, ...) abort
-    " Default revisions to diff: the working directory (special Lawrencium 
-    " hard-coded syntax) and the parent of the working directory (using 
+    " Default revisions to diff: the working directory (special Lawrencium
+    " hard-coded syntax) and the parent of the working directory (using
     " Mercurial's revsets syntax).
     let l:rev1 = 'lawrencium#_wdir_'
     let l:rev2 = 'p1()'
@@ -709,7 +709,7 @@ function! s:HgCommit(bang, vertical, ...) abort
     call s:DefineMainCommands()
 endfunction
 
-let s:hg_status_messages = { 
+let s:hg_status_messages = {
     \'M': 'modified',
     \'A': 'added',
     \'R': 'removed',
@@ -825,3 +825,7 @@ endfunction
 
 " }}}
 
+" Add commands
+for cmd in s:main_commands
+    execute 'command! -buffer ' . cmd
+endfor
