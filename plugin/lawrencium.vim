@@ -330,21 +330,27 @@ call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call
 
 " Hglog {{{
 
-function! s:HgLog() abort
-    " Get the repo and the `hg log` output.
+function! s:HgLog(...) abort
+    " Get the repo
+    " and the `hg log` output.
     let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('log --stat')
-    if l:status_text ==# '\v%^\s*%$'
-        echo "No history."
+    if a:0
+        let l:log_text = l:repo.RunCommand('log', '--cwd', l:repo.root_dir, ' '.join(a:000))
+    else
+        let l:log_text = l:repo.RunCommand('log', '--stat')
+    endif
+    if l:log_text ==# '\v%^\s*%$'
+        echo "No log."
     endif
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg status` output in there.
     let l:temp_file = s:tempname('hg-log-', '.txt')
-    let l:status_lines = split(l:status_text, '\n')
+    let l:log_lines = split(l:log_text, '\n')
+    pclose
     execute "vsplit " . l:temp_file
     setlocal previewwindow bufhidden=delete
-    call append(0, l:status_lines)
+    call append(0, l:log_lines)
     call cursor(1, 1)
 
     " Setup the buffer correctly: readonly, and with the correct repo linked
@@ -360,7 +366,6 @@ function! s:HgLog() abort
     command! -buffer          Hglogedit         :call s:HgLog_FileEdit()
     command! -buffer          Hglogdiff         :call s:HgLog_Diff(0)
     command! -buffer          Hglogvdiff        :call s:HgLog_Diff(1)
-    command! -buffer          Hglogrefresh      :call s:HgLog_Refresh()
 
     " Add some handy mappings.
     if g:lawrencium_define_mappings
@@ -369,7 +374,6 @@ function! s:HgLog() abort
         nnoremap <buffer> <silent> <C-P> :call search('^changeset:', 'Wb')<cr>
         nnoremap <buffer> <silent> <C-D> :Hglogdiff<cr>
         nnoremap <buffer> <silent> <C-V> :Hglogvdiff<cr>
-        nnoremap <buffer> <silent> <C-R> :Hglogrefresh<cr>
         nnoremap <buffer> <silent> q     :bdelete!<cr>
     endif
 endfunction
@@ -401,7 +405,7 @@ function! s:HgLog_Diff(vertical) abort
     call s:HgDiff('%:p', a:vertical)
 endfunction
 
-call s:AddMainCommand("Hglog :call s:HgLog()")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
 
 " }}}
 
