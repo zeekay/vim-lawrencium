@@ -324,8 +324,7 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
         return s:ListRepoFiles(a:ArgLead, a:CmdLine, a:CursorPos)
 endfunction
 
-call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call s:Hg(<bang>0, <f-args>)")
-
+command! -bang -complete=customlist,s:CompleteHg -nargs=* Hg :call s:Hg(<bang>0, <f-args>)
 " }}}
 
 " Hglog {{{
@@ -909,8 +908,3 @@ function! lawrencium#debugtrace(...)
 endfunction
 
 " }}}
-
-" Add commands
-for cmd in s:main_commands
-    execute 'command! -buffer ' . cmd
-endfor
