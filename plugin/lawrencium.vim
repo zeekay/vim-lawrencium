@@ -378,7 +378,7 @@ function! s:HgLog(...) abort
     endif
 endfunction
 
-function! s:HgLog_FileEdit() abort
+function! s:HgLog_FileEdit(...) abort
     " Get the path of the file the cursor is on.
     let l:repo = s:hg_repo()
     let l:line = getline('.')
@@ -396,7 +396,12 @@ function! s:HgLog_FileEdit() abort
         endif
     endfor
     wincmd p
-    execute 'edit ' . l:filename
+    if a:0
+        let l:temp_file = tempname()
+        call l:repo.RunCommand('cat', '-r', '"'. a:1 .'"', '-o', l:temp_file, l:filename)
+    else
+        execute 'edit ' . l:filename
+    endif
 endfunction
 
 function! s:HgLog_Diff(vertical) abort
@@ -592,16 +597,31 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 
 " Hgedit {{{
 
-function! s:HgEdit(bang, filename) abort
-    let l:full_path = s:hg_repo().GetFullPath(a:filename)
+function! s:HgEdit(bang, filename, ...) abort
     if a:bang
-        execute "edit! " . l:full_path
+        let l:cmd = 'edit! '
     else
-        execute "edit " . l:full_path
+        let l:cmd = 'edit '
+    endif
+
+    if a:0
+        " Editing a previous revision
+        let l:temp_file = tempname()
+        let l:repo = s:hg_repo()
+        call l:repo.RunCommand('cat', '--cwd', l:repo.root_dir, '-r', a:1, a:filename, '-o', l:temp_file)
+        execute l:cmd . l:temp_file
+        " Remember the repo it belongs to.
+        let b:mercurial_dir = l:repo.root_dir
+        " Make commands available.
+        call s:DefineMainCommands()
+    else
+        " Editing file in cwd
+        let l:full_path = s:hg_repo().GetFullPath(a:filename)
+        execute l:cmd . l:full_path
     endif
 endfunction
 
-call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
 
 " }}}
 
@@ -649,6 +669,7 @@ function! s:HgDiff(filename, vertical, ...) abort
         let b:mercurial_dir = l:repo.root_dir
         " Make sure it's deleted when we move away from it.
         setlocal bufhidden=delete
+        let b:mercurial_dir = l:repo.root_dir
         " Make commands available.
         call s:DefineMainCommands()
     endif
