@@ -328,6 +328,91 @@ call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call
 
 " }}}
 
+" Hglog {{{
+
+function! s:HgLog() abort
+    " Get the repo and the `hg log` output.
+    let l:repo = s:hg_repo()
+    let l:status_text = l:repo.RunCommand('log --stat')
+    if l:status_text ==# '\v%^\s*%$'
+        echo "No history."
+    endif
+
+    " Open a new temp buffer in the preview window, jump to it,
+    " and paste the `hg status` output in there.
+    let l:temp_file = s:tempname('hg-log-', '.txt')
+    let l:status_lines = split(l:status_text, '\n')
+    execute "vsplit " . l:temp_file
+    setlocal previewwindow bufhidden=delete
+    call append(0, l:status_lines)
+    call cursor(1, 1)
+
+    " Setup the buffer correctly: readonly, and with the correct repo linked
+    " to it.
+    let b:mercurial_dir = l:repo.root_dir
+    setlocal buftype=nofile
+    setlocal syntax=hglog
+
+    " Make commands available.
+    call s:DefineMainCommands()
+
+    " set buffer dir to repo root so gf works
+    " Hgcd
+
+    " Add some nice commands.
+    command! -buffer          Hglogedit         :call s:HgLog_FileEdit()
+    " command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
+    " command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
+    " command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
+    " command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
+    " command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
+    " command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
+
+    " Add some handy mappings.
+    if g:lawrencium_define_mappings
+        nnoremap <buffer> <silent> <cr>  :Hglogedit<cr>
+        nnoremap <buffer> <silent> <C-N> :call search('^changeset:', 'W')<cr>
+        nnoremap <buffer> <silent> <C-P> :call search('^changeset:', 'Wb')<cr>
+        " nnoremap <buffer> <silent> <C-D> :Hgstatusdiff<cr>
+        " nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
+        " nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+        " nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+        " nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
+        nnoremap <buffer> <silent> q     :bdelete!<cr>
+
+        " vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+        " vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+    endif
+
+    " Make sure the file is deleted with the buffer.
+    autocmd BufDelete <buffer> call s:HgStatus_CleanUp(expand('<afile>:p'))
+endfunction
+
+function! s:HgLog_FileEdit() abort
+    " Get the path of the file the cursor is on.
+    let l:repo = s:hg_repo()
+    let l:line = getline('.')
+    let l:filename = matchstr(l:line, '\v(^\s)@<=[^|]*')
+    let l:filename = l:repo.GetFullPath(l:filename)
+
+    " If the file is already open in a window, jump to that window.
+    " Otherwise, jump to the previous window and open it there.
+    for nr in range(1, winnr('$'))
+        let l:br = winbufnr(nr)
+        let l:bpath = fnamemodify(bufname(l:br), ':p')
+        if l:bpath ==# l:filename
+            execute nr . 'wincmd w'
+            return
+        endif
+    endfor
+    wincmd p
+    execute 'edit ' . l:filename
+endfunction
+
+call s:AddMainCommand("Hglog :call s:HgLog()")
+
+" }}}
+
 " Hgstatus {{{
 
 function! s:HgStatus() abort
