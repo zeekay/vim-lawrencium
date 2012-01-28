@@ -598,6 +598,8 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 " Hgedit {{{
 
 function! s:HgEdit(bang, filename, ...) abort
+    let l:repo = s:hg_repo()
+
     if a:bang
         let l:cmd = 'edit! '
     else
@@ -606,17 +608,23 @@ function! s:HgEdit(bang, filename, ...) abort
 
     if a:0
         " Editing a previous revision
-        let l:temp_file = tempname()
-        let l:repo = s:hg_repo()
-        call l:repo.RunCommand('cat', '--cwd', l:repo.root_dir, '-r', a:1, a:filename, '-o', l:temp_file)
+        let l:rev = a:1
+
+        " Create temp file
+        let l:fn = '--' . a:filename
+        let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev . l:fn
+
+        " Edit revision of file
+        call l:repo.RunCommand('cat', '--cwd', l:repo.root_dir, '-r', l:rev, a:filename, '-o', l:temp_file)
         execute l:cmd . l:temp_file
+
         " Remember the repo it belongs to.
         let b:mercurial_dir = l:repo.root_dir
         " Make commands available.
         call s:DefineMainCommands()
     else
         " Editing file in cwd
-        let l:full_path = s:hg_repo().GetFullPath(a:filename)
+        let l:full_path = l:repo.GetFullPath(a:filename)
         execute l:cmd . l:full_path
     endif
 endfunction
@@ -632,7 +640,7 @@ function! s:HgDiff(filename, vertical, ...) abort
     " hard-coded syntax) and the parent of the working directory (using
     " Mercurial's revsets syntax).
     let l:rev1 = 'lawrencium#_wdir_'
-    let l:rev2 = 'p1()'
+    let l:rev2 = ''
     if a:0 == 1
         let l:rev2 = a:1
     elseif a:0 == 2
@@ -660,9 +668,14 @@ function! s:HgDiff(filename, vertical, ...) abort
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
     else
-        let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', '-o', l:temp_file, l:path)
+        " Nice filenames
+        let l:fn = '--' . fnamemodify(l:path, ':t')
+        let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev1 . l:fn
+
+        " Use hg cat to create temporary copy of revision of file and edit
+        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', l:path, '-o', l:temp_file)
         execute 'edit ' . fnameescape(l:temp_file)
+
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
         " Remember the repo it belongs to.
@@ -682,9 +695,20 @@ function! s:HgDiff(filename, vertical, ...) abort
     if l:rev2 == 'lawrencium#_wdir_'
         execute l:diffsplit . ' ' . fnameescape(l:path)
     else
-        let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', '-o', l:temp_file, l:path)
+        " Nice filenames
+        let l:fn = '--' . fnamemodify(l:path, ':t')
+
+        " Get revision if we don't have it
+        if l:rev2 == ''
+            let l:fn = join(split(l:repo.RunCommand('id', '-r', '-1', '-n', '-b', '-t')), '-') . l:fn
+        endif
+
+        let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev2 . l:fn
+
+        " Use hg cat to create temporary copy of revision of file and edit
+        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', l:path, '-o', l:temp_file)
         execute l:diffsplit . ' ' . fnameescape(l:temp_file)
+
         " Remember the repo it belongs to.
         let b:mercurial_dir = l:repo.root_dir
         " Make sure it's deleted when we move away from it.
