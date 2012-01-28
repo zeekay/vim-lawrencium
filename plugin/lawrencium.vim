@@ -335,7 +335,12 @@ function! s:HgLog(...) abort
     " and the `hg log` output.
     let l:repo = s:hg_repo()
     if a:0
-        let l:log_text = l:repo.RunCommand('log', '--cwd', l:repo.root_dir, ' '.join(a:000))
+        if a:1 == '%'
+            " Probably a better way to handle this
+            let l:log_text = l:repo.RunCommand('log', '--stat', '--cwd', l:repo.root_dir, expand('%'))
+        else
+            let l:log_text = l:repo.RunCommand('log', '--stat', '--cwd', l:repo.root_dir, ' '.join(a:000))
+        endif
     else
         let l:log_text = l:repo.RunCommand('log', '--stat')
     endif
