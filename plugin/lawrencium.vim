@@ -356,36 +356,22 @@ function! s:HgLog() abort
     " Make commands available.
     call s:DefineMainCommands()
 
-    " set buffer dir to repo root so gf works
-    " Hgcd
-
     " Add some nice commands.
     command! -buffer          Hglogedit         :call s:HgLog_FileEdit()
-    " command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
-    " command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
-    " command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
-    " command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
-    " command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
-    " command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
+    command! -buffer          Hglogdiff         :call s:HgLog_Diff(0)
+    command! -buffer          Hglogvdiff        :call s:HgLog_Diff(1)
+    command! -buffer          Hglogrefresh      :call s:HgLog_Refresh()
 
     " Add some handy mappings.
     if g:lawrencium_define_mappings
         nnoremap <buffer> <silent> <cr>  :Hglogedit<cr>
         nnoremap <buffer> <silent> <C-N> :call search('^changeset:', 'W')<cr>
         nnoremap <buffer> <silent> <C-P> :call search('^changeset:', 'Wb')<cr>
-        " nnoremap <buffer> <silent> <C-D> :Hgstatusdiff<cr>
-        " nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
-        " nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
-        " nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
-        " nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
+        nnoremap <buffer> <silent> <C-D> :Hglogdiff<cr>
+        nnoremap <buffer> <silent> <C-V> :Hglogvdiff<cr>
+        nnoremap <buffer> <silent> <C-R> :Hglogrefresh<cr>
         nnoremap <buffer> <silent> q     :bdelete!<cr>
-
-        " vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
-        " vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
     endif
-
-    " Make sure the file is deleted with the buffer.
-    autocmd BufDelete <buffer> call s:HgStatus_CleanUp(expand('<afile>:p'))
 endfunction
 
 function! s:HgLog_FileEdit() abort
@@ -407,6 +393,12 @@ function! s:HgLog_FileEdit() abort
     endfor
     wincmd p
     execute 'edit ' . l:filename
+endfunction
+
+function! s:HgLog_Diff(vertical) abort
+    " Open the file and run `Hgdiff` on it.
+    call s:HgLog_FileEdit()
+    call s:HgDiff('%:p', a:vertical)
 endfunction
 
 call s:AddMainCommand("Hglog :call s:HgLog()")
@@ -869,6 +861,7 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvco
 " }}}
 
 " Hginit {{{
+
 function! s:HgInit() abort
     let l:hg_command = g:lawrencium_hg_executable . ' init'
     execute 'silent !' . l:hg_command | redraw!
@@ -876,6 +869,7 @@ function! s:HgInit() abort
 endfunction
 
 command! Hginit :call s:HgInit()
+
 " }}}
 
 " Autoload Functions {{{
