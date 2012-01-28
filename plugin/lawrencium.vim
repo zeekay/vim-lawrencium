@@ -324,7 +324,8 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
         return s:ListRepoFiles(a:ArgLead, a:CmdLine, a:CursorPos)
 endfunction
 
-command! -bang -complete=customlist,s:CompleteHg -nargs=* Hg :call s:Hg(<bang>0, <f-args>)
+call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call s:Hg(<bang>0, <f-args>)")
+
 " }}}
 
 " Hglog {{{
@@ -865,6 +866,16 @@ endfunction
 call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgcommit :call s:HgCommit(<bang>0, 0, <f-args>)")
 call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvcommit :call s:HgCommit(<bang>0, 1, <f-args>)")
 
+" }}}
+
+" Hginit {{{
+function! s:HgInit() abort
+    let l:hg_command = g:lawrencium_hg_executable . ' init'
+    execute 'silent !' . l:hg_command | redraw!
+    call s:setup_buffer_commands()
+endfunction
+
+command! Hginit :call s:HgInit()
 " }}}
 
 " Autoload Functions {{{
