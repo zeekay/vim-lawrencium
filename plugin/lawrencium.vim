@@ -348,7 +348,8 @@ function! s:HgLog(...) abort
     let l:temp_file = s:tempname('hg-log-', '.txt')
     let l:log_lines = split(l:log_text, '\n')
     pclose
-    execute "vsplit " . l:temp_file
+    execute 'vsplit ' . fnameescape(l:temp_file)
+
     setlocal previewwindow bufhidden=delete
     call append(0, l:log_lines)
     call cursor(1, 1)
@@ -364,8 +365,7 @@ function! s:HgLog(...) abort
 
     " Add some nice commands.
     command! -buffer          Hglogedit         :call s:HgLog_FileEdit()
-    command! -buffer          Hglogdiff         :call s:HgLog_Diff(0)
-    command! -buffer          Hglogvdiff        :call s:HgLog_Diff(1)
+    command! -buffer          Hglogdiff         :call s:HgLog_Diff()
 
     " Add some handy mappings.
     if g:lawrencium_define_mappings
@@ -373,41 +373,42 @@ function! s:HgLog(...) abort
         nnoremap <buffer> <silent> <C-N> :call search('^changeset:', 'W')<cr>
         nnoremap <buffer> <silent> <C-P> :call search('^changeset:', 'Wb')<cr>
         nnoremap <buffer> <silent> <C-D> :Hglogdiff<cr>
-        nnoremap <buffer> <silent> <C-V> :Hglogvdiff<cr>
         nnoremap <buffer> <silent> q     :bdelete!<cr>
     endif
 endfunction
 
-function! s:HgLog_FileEdit(...) abort
+function! s:HgLog_FileEdit() abort
     " Get the path of the file the cursor is on.
-    let l:repo = s:hg_repo()
     let l:line = getline('.')
-    let l:filename = matchstr(l:line, '\v(^\s)@<=[^|]*')
-    let l:filename = l:repo.GetFullPath(l:filename)
+    let l:path = matchstr(l:line, '\v(^\s)@<=[^|]*')
 
-    " If the file is already open in a window, jump to that window.
-    " Otherwise, jump to the previous window and open it there.
-    for nr in range(1, winnr('$'))
-        let l:br = winbufnr(nr)
-        let l:bpath = fnamemodify(bufname(l:br), ':p')
-        if l:bpath ==# l:filename
-            execute nr . 'wincmd w'
-            return
-        endif
-    endfor
-    wincmd p
-    if a:0
-        let l:temp_file = tempname()
-        call l:repo.RunCommand('cat', '-r', '"'. a:1 .'"', '-o', l:temp_file, l:filename)
-    else
-        execute 'edit ' . l:filename
-    endif
+    " Get changeset rev
+    let l:rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
+
+    call s:HgEdit(0, l:path, l:rev)
 endfunction
 
-function! s:HgLog_Diff(vertical) abort
-    " Open the file and run `Hgdiff` on it.
-    call s:HgLog_FileEdit()
-    call s:HgDiff('%:p', a:vertical)
+function! s:HgLog_Diff() abort
+    let l:repo = s:hg_repo()
+
+    " Get the path of the file the cursor is on.
+    let l:line = getline('.')
+    let l:path = matchstr(l:line, '\v(^\s)@<=[^|]*')
+
+    " Get changeset rev
+    let l:rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
+
+    call s:HgEdit(0, l:path, l:rev)
+    call s:HgDiff_DiffThis()
+
+    " Remember the repo it belongs to.
+    let b:mercurial_dir = l:repo.root_dir
+    " Make sure it's deleted when we move away from it.
+    setlocal bufhidden=delete
+    " Make commands available.
+    call s:DefineMainCommands()
+    wincmd p
+    execute 'diffthis'
 endfunction
 
 call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
@@ -599,6 +600,7 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 
 function! s:HgEdit(bang, filename, ...) abort
     let l:repo = s:hg_repo()
+    let l:path = l:repo.GetFullPath(a:filename)
 
     if a:bang
         let l:cmd = 'edit! '
@@ -611,11 +613,11 @@ function! s:HgEdit(bang, filename, ...) abort
         let l:rev = a:1
 
         " Create temp file
-        let l:fn = '--' . a:filename
+        let l:fn = '--' . fnamemodify(l:path, ':t')
         let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev . l:fn
 
         " Edit revision of file
-        call l:repo.RunCommand('cat', '--cwd', l:repo.root_dir, '-r', l:rev, a:filename, '-o', l:temp_file)
+        call l:repo.RunCommand('cat', '-r', l:rev, l:path, '-o', l:temp_file)
         execute l:cmd . l:temp_file
 
         " Remember the repo it belongs to.
