@@ -378,14 +378,33 @@ function! s:HgLog(...) abort
 endfunction
 
 function! s:HgLog_FileEdit() abort
-    " Get the path of the file the cursor is on.
-    let l:line = getline('.')
-    let l:path = matchstr(l:line, '\v(^\s)@<=[^|]*')
-
     " Get changeset rev
     let l:rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
 
-    call s:HgEdit(0, l:path, l:rev)
+    " Get the path of the file under the cursor, or files from changest we're in
+    let l:line = getline('.')
+    let l:path = matchstr(l:line, '\v(^\s)@<=[^|]*')
+
+    if l:path == ''
+        " Not on a path line, Edit all files in changeset
+        " Get start/end offsets for curreng changeset
+        let l:start = line('.')
+        let l:end = search('^changeset:','nW') - 3
+        if l:end < 1
+            let l:end = line('$') - 3
+        endif
+
+        for line in range(l:start, l:end)
+            " Try to match path
+            let l:path = matchstr(getline(l:line), '\v(^\s)@<=[^|]*')
+            if l:path != ''
+                call s:HgEdit(0, l:path, l:rev)
+            endif
+        endfor
+    else
+        " Edit file on current line
+        call s:HgEdit(0, l:path, l:rev)
+    endif
 endfunction
 
 function! s:HgLog_Diff() abort
