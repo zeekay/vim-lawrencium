@@ -242,9 +242,10 @@ function! s:FileRead()
     let repo = l[1]
     let rev = l[2]
     let path = l[3]
+    " Delete the buffer that was errenously created because I'm not using
+    " FileReadCmd au properly
     bd
     call s:HgEdit(0, path, rev, repo)
-    filetype on
 endfunction
 
 augroup lawrencium_files
@@ -377,7 +378,6 @@ function! s:HgLog(...) abort
     endfor
     " replace quickfix list with new entries
     call setqflist(list,'r')
-    copen
     map <buffer> q :close<cr>
 endfunction
 
@@ -434,6 +434,7 @@ function! s:HgLogStat(...) abort
         nnoremap <buffer> <silent> q     :bdelete!<cr>
     endif
 endfunction
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglogstat :call s:HgLogStat(<f-args>)")
 
 function! s:HgLog_FileEdit() abort
     " Get changeset rev
@@ -481,14 +482,12 @@ function! s:HgLog_Diff() abort
     " Remember the repo it belongs to.
     let b:mercurial_dir = l:repo.root_dir
     " Make sure it's deleted when we move away from it.
-    setlocal bufhidden=delete
+    " setlocal bufhidden=delete
     " Make commands available.
     call s:DefineMainCommands()
     wincmd p
     execute 'diffthis'
 endfunction
-
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglogstat :call s:HgLogStat(<f-args>)")
 
 " }}}
 
@@ -703,6 +702,12 @@ function! s:HgEdit(bang, filename, ...) abort
         call l:repo.RunCommand('cat', '-r', l:rev, l:path, '-o', l:temp_file)
         execute l:cmd . l:temp_file
         let l:ext = fnamemodify(l:temp_file, ':e')
+
+        " Set filetype since it doesn't seem to get triggered
+        exe 'set ft='.l:ext
+        " Set read-only and delete when hidden
+        set ro
+        setlocal bufhidden=delete
     else
         " Editing file in cwd
         let l:full_path = l:repo.GetFullPath(a:filename)
@@ -714,10 +719,189 @@ function! s:HgEdit(bang, filename, ...) abort
     let b:mercurial_dir = l:repo.root_dir
     " Make commands available.
     call s:DefineMainCommands()
-    exe 'set ft='.l:ext
+endfunction
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
+
+" }}}
+
+" Hgstatus {{{
+
+function! s:HgStatus() abort
+    " Get the repo and the `hg status` output.
+    let l:repo = s:hg_repo()
+    let l:status_text = l:repo.RunCommand('status')
+    if l:status_text ==# '\v%^\s*%$'
+        echo "Nothing modified."
+    endif
+
+    " Open a new temp buffer in the preview window, jump to it,
+    " and paste the `hg status` output in there.
+    let l:temp_file = s:tempname('hg-status-', '.txt')
+    let l:preview_height = &previewheight
+    let l:status_lines = split(l:status_text, '\n')
+    execute "setlocal previewheight=" . (len(l:status_lines) + 1)
+    execute "pedit " . l:temp_file
+    wincmd p
+    call append(0, l:status_lines)
+    call cursor(1, 1)
+    " Make it a nice size.
+    execute "setlocal previewheight=" . l:preview_height
+    " Make sure it's deleted when we exit the window.
+    setlocal bufhidden=delete
+
+    " Setup the buffer correctly: readonly, and with the correct repo linked
+    " to it.
+    let b:mercurial_dir = l:repo.root_dir
+    setlocal buftype=nofile
+    setlocal syntax=hgstatus
+
+    " Make commands available.
+    call s:DefineMainCommands()
+
+    " Add some nice commands.
+    command! -buffer          Hgstatusedit      :call s:HgStatus_FileEdit()
+    command! -buffer          Hgstatusdiff      :call s:HgStatus_Diff(0)
+    command! -buffer          Hgstatusvdiff     :call s:HgStatus_Diff(1)
+    command! -buffer          Hgstatusrefresh   :call s:HgStatus_Refresh()
+    command! -buffer -range   Hgstatusaddremove :call s:HgStatus_AddRemove(<line1>, <line2>)
+    command! -buffer -range=% -bang Hgstatuscommit  :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 0)
+    command! -buffer -range=% -bang Hgstatusvcommit :call s:HgStatus_Commit(<line1>, <line2>, <bang>0, 1)
+
+    " Add some handy mappings.
+    if g:lawrencium_define_mappings
+        nnoremap <buffer> <silent> <cr>  :Hgstatusedit<cr>
+        nnoremap <buffer> <silent> <C-N> :call search('^[MARC\!\?I ]\s.', 'We')<cr>
+        nnoremap <buffer> <silent> <C-P> :call search('^[MARC\!\?I ]\s.', 'Wbe')<cr>
+        nnoremap <buffer> <silent> <C-D> :Hgstatusdiff<cr>
+        nnoremap <buffer> <silent> <C-V> :Hgstatusvdiff<cr>
+        nnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+        nnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+        nnoremap <buffer> <silent> <C-R> :Hgstatusrefresh<cr>
+        nnoremap <buffer> <silent> q     :bdelete!<cr>
+
+        vnoremap <buffer> <silent> <C-A> :Hgstatusaddremove<cr>
+        vnoremap <buffer> <silent> <C-S> :Hgstatuscommit<cr>
+    endif
+
+    " Make sure the file is deleted with the buffer.
+    autocmd BufDelete <buffer> call s:HgStatus_CleanUp(expand('<afile>:p'))
 endfunction
 
-call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
+function! s:HgStatus_CleanUp(path) abort
+    " If the `hg status` output has been saved to disk (e.g. because of a
+    " refresh we did), let's delete it.
+    if filewritable(a:path)
+        call s:trace("Cleaning up status log: " . a:path)
+        call delete(a:path)
+    endif
+endfunction
+
+function! s:HgStatus_Refresh() abort
+    " Get the repo and the `hg status` output.
+    let l:repo = s:hg_repo()
+    let l:status_text = l:repo.RunCommand('status')
+
+    " Replace the contents of the current buffer with it, and refresh.
+    echo "Writing to " . expand('%:p')
+    let l:path = expand('%:p')
+    let l:status_lines = split(l:status_text, '\n')
+    call writefile(l:status_lines, l:path)
+    edit
+endfunction
+
+function! s:HgStatus_FileEdit() abort
+    " Get the path of the file the cursor is on.
+    let l:filename = s:HgStatus_GetSelectedFile()
+
+    " If the file is already open in a window, jump to that window.
+    " Otherwise, jump to the previous window and open it there.
+    for nr in range(1, winnr('$'))
+        let l:br = winbufnr(nr)
+        let l:bpath = fnamemodify(bufname(l:br), ':p')
+        if l:bpath ==# l:filename
+            execute nr . 'wincmd w'
+            return
+        endif
+    endfor
+    wincmd p
+    execute 'edit ' . l:filename
+endfunction
+
+function! s:HgStatus_AddRemove(linestart, lineend) abort
+    " Get the selected filenames.
+    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['!', '?'])
+    if len(l:filenames) == 0
+        call s:error("No files to add or remove in selection or current line.")
+    endif
+
+    " Run `addremove` on those paths.
+    let l:repo = s:hg_repo()
+    call l:repo.RunCommand('addremove', l:filenames)
+
+    " Refresh the status window.
+    call s:HgStatus_Refresh()
+endfunction
+
+function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
+    " Get the selected filenames.
+    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(l:filenames) == 0
+        call s:error("No files to commit in selection or file.")
+    endif
+
+    " Run `Hgcommit` on those paths.
+    call s:HgCommit(a:bang, a:vertical, l:filenames)
+endfunction
+
+function! s:HgStatus_Diff(vertical) abort
+    " Open the file and run `Hgdiff` on it.
+    call s:HgStatus_FileEdit()
+    call s:HgDiff('%:p', a:vertical)
+endfunction
+
+function! s:HgStatus_GetSelectedFile() abort
+    let l:filenames = s:HgStatus_GetSelectedFiles()
+    return l:filenames[0]
+endfunction
+
+function! s:HgStatus_GetSelectedFiles(...) abort
+    if a:0 >= 2
+        let l:lines = getline(a:1, a:2)
+    else
+        let l:lines = []
+        call add(l:lines, getline('.'))
+    endif
+    let l:filenames = []
+    let l:repo = s:hg_repo()
+    for line in l:lines
+        if a:0 >= 3
+            let l:status = s:HgStatus_GetFileStatus(line)
+            if index(a:3, l:status) < 0
+                continue
+            endif
+        endif
+        " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
+        " look-aheads and look-behinds. See for yourself:
+        let l:filename = matchstr(l:line, '\v(^[MARC\!\?I ]\s)@<=.*')
+        let l:filename = l:repo.GetFullPath(l:filename)
+        call add(l:filenames, l:filename)
+    endfor
+    return l:filenames
+endfunction
+
+function! s:HgStatus_GetFileStatus(...) abort
+    let l:line = a:0 ? a:1 : getline('.')
+    return matchstr(l:line, '\v^[MARC\!\?I ]')
+endfunction
+
+call s:AddMainCommand("Hgstatus :call s:HgStatus()")
+
+" }}}
+
+" Hgcd, Hglcd {{{
+
+call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hgcd :cd<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
+call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd :lcd<bang> `=s:hg_repo().GetFullPath(<q-args>)`")
 
 " }}}
 
@@ -770,7 +954,6 @@ function! s:HgDiff(filename, vertical, ...) abort
         let b:mercurial_dir = l:repo.root_dir
         " Make sure it's deleted when we move away from it.
         setlocal bufhidden=delete
-        let b:mercurial_dir = l:repo.root_dir
         " Make commands available.
         call s:DefineMainCommands()
     endif
