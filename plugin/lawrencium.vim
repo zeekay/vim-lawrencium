@@ -235,6 +235,25 @@ augroup end
 
 " }}}
 
+" File format {{{
+
+function! s:FileRead()
+    let l = matchlist(expand('<amatch>'), '\vhg://(.*)//(.*)//(.*)')
+    let repo = l[1]
+    let rev = l[2]
+    let path = l[3]
+    bd
+    call s:HgEdit(0, path, rev, repo)
+    filetype on
+endfunction
+
+augroup lawrencium_files
+    autocmd!
+    autocmd BufReadCmd hg://** exe s:FileRead()
+augroup end
+
+" }}}
+
 " Commands Auto-Complete {{{
 
 " Auto-complete function for commands that take repo-relative file paths.
@@ -328,16 +347,50 @@ call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call
 
 " }}}
 
-" Hglog {{{
-
+" Hglog / Hglogstat {{{
 function! s:HgLog(...) abort
+    let l:repo = s:hg_repo()
+    let l:template = "'{rev}////{files}////{author}////{desc|strip}\n'"
+    if a:0
+        let l:log_text = l:repo.RunCommand('log', '--cwd', l:repo.root_dir, '--template', l:template, ' '.join(a:000))
+    else
+        let l:log_text = l:repo.RunCommand('log', '--template', l:template, expand('%'))
+    endif
+
+    let list = []
+    for line in split(l:log_text, '\n')
+        " Parse each log entry
+        let ml = matchlist(line, '\v(.*)////(.*)////(.*)////(.*)')
+        if len(ml) > 1
+            let rev = ml[1]
+            let files = split(ml[2], ' ')
+            let author = ml[3]
+            let desc = ml[4]
+            for file in files
+                " Format filename for quickfix list
+                let filename = 'hg://'.l:repo.root_dir.'//'.rev.'//'.file.' '
+                let text = author.' || '.desc
+                let entry = {'filename': filename, 'text': text}
+                let list += [entry]
+            endfor
+        endif
+    endfor
+    " replace quickfix list with new entries
+    call setqflist(list,'r')
+    copen
+    map <buffer> q :close<cr>
+endfunction
+
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
+
+function! s:HgLogStat(...) abort
     " Get the repo
     " and the `hg log` output.
     let l:repo = s:hg_repo()
     if a:0
         if a:1 == '%'
             " Probably a better way to handle this
-            let l:log_text = l:repo.RunCommand('log', '--stat', '--cwd', l:repo.root_dir, expand('%'))
+            let l:log_text = l:repo.RunCommand('log', '--stat', expand('%'))
         else
             let l:log_text = l:repo.RunCommand('log', '--stat', '--cwd', l:repo.root_dir, ' '.join(a:000))
         endif
@@ -435,7 +488,7 @@ function! s:HgLog_Diff() abort
     execute 'diffthis'
 endfunction
 
-call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
+call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglogstat :call s:HgLogStat(<f-args>)")
 
 " }}}
 
@@ -623,17 +676,23 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 " Hgedit {{{
 
 function! s:HgEdit(bang, filename, ...) abort
-    let l:repo = s:hg_repo()
-    let l:path = l:repo.GetFullPath(a:filename)
-
+    " Takes two optional arguments, revision and repo
     if a:bang
         let l:cmd = 'edit! '
     else
         let l:cmd = 'edit '
     endif
 
+    " Repo
+    if a:0 && a:0 == 2
+        let l:repo = s:hg_repo(a:2)
+    else
+        let l:repo = s:hg_repo()
+    endif
+    let l:path = l:repo.GetFullPath(a:filename)
+
+    " Revision
     if a:0
-        " Editing a previous revision
         let l:rev = a:1
 
         " Create temp file
@@ -643,16 +702,19 @@ function! s:HgEdit(bang, filename, ...) abort
         " Edit revision of file
         call l:repo.RunCommand('cat', '-r', l:rev, l:path, '-o', l:temp_file)
         execute l:cmd . l:temp_file
-
-        " Remember the repo it belongs to.
-        let b:mercurial_dir = l:repo.root_dir
-        " Make commands available.
-        call s:DefineMainCommands()
+        let l:ext = fnamemodify(l:temp_file, ':e')
     else
         " Editing file in cwd
         let l:full_path = l:repo.GetFullPath(a:filename)
         execute l:cmd . l:full_path
+        let l:ext = fnamemodify(l:full_path, ':e')
     endif
+
+    " Remember the repo it belongs to.
+    let b:mercurial_dir = l:repo.root_dir
+    " Make commands available.
+    call s:DefineMainCommands()
+    exe 'set ft='.l:ext
 endfunction
 
 call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgedit :call s:HgEdit(<bang>0, <f-args>)")
