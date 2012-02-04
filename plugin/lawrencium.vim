@@ -686,44 +686,26 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 " Hgedit {{{
 
 function! s:HgEdit(bang, filename, ...) abort
-    " Takes two optional arguments, revision and repo
+    let repo = s:hg_repo()
+
     if a:bang
         let cmd = 'edit! '
     else
         let cmd = 'edit '
     endif
 
-    " Repo
-    if a:0 && a:0 == 2
-        let repo = s:hg_repo(a:2)
-    else
-        let repo = s:hg_repo()
-    endif
-    let path = repo.GetFullPath(a:filename)
-
-    " Revision
     if a:0
+        " Editing older revision of a file
         let rev = a:1
 
-        " Create temp file
-        let fn = '--'.fnamemodify(path, ':t')
-        let temp_file = fnamemodify(tempname(), ':p:h').'/'.rev.fn
-
-        " Edit revision of file
-        call repo.RunCommand('cat', '-r', rev, path, '-o', temp_file)
-        execute cmd . temp_file
-        let ext = fnamemodify(temp_file, ':e')
-
-        " Set filetype since it doesn't seem to get triggered
-        exe 'set ft='.ext
-        " Set read-only and delete when hidden
-        set ro
-        setlocal bufhidden=delete
+        " Create new file using same format as quickfix list, which will
+        " trigger the file read
+        let fn = 'hg://'.repo.root_dir.'//'.rev.'//'.a:filename
+        exe cmd.fn
     else
         " Editing file in cwd
         let full_path = repo.GetFullPath(a:filename)
-        execute cmd . full_path
-        let ext = fnamemodify(full_path, ':e')
+        execute cmd.full_path
     endif
 
     " Remember the repo it belongs to.
