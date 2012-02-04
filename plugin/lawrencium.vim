@@ -11,6 +11,7 @@ endif
 if (exists('g:loaded_lawrencium') || &cp) && !g:lawrencium_debug
     finish
 endif
+
 if (exists('g:loaded_lawrencium') && g:lawrencium_debug)
     echom "Reloaded Lawrencium."
 endif
@@ -50,19 +51,19 @@ endfunction
 
 " Like tempname() but with some control over the filename.
 function! s:tempname(name, ...)
-    let l:path = tempname()
-    let l:result = fnamemodify(l:path, ':h') . '/' . a:name . fnamemodify(l:path, ':t')
+    let path = tempname()
+    let result = fnamemodify(path, ':h') . '/' . a:name . fnamemodify(path, ':t')
     if a:0 > 0
-        let l:result = l:result . a:1
+        let result = result . a:1
     endif
-    return l:result
+    return result
 endfunction
 
 " Prints a message if debug tracing is enabled.
 function! s:trace(message, ...)
    if g:lawrencium_trace || (a:0 && a:1)
-       let l:message = "lawrencium: " . a:message
-       echom l:message
+       let message = "lawrencium: " . a:message
+       echom message
    endif
 endfunction
 
@@ -80,14 +81,14 @@ endfunction
 " Finds the repository root given a path inside that repository.
 " Throw an error if not repository is found.
 function! s:find_repo_root(path)
-    let l:path = s:stripslash(a:path)
-    let l:previous_path = ""
-    while l:path != l:previous_path
-        if isdirectory(l:path . '/.hg/store')
-            return simplify(fnamemodify(l:path, ':p'))
+    let path = s:stripslash(a:path)
+    let previous_path = ""
+    while path != previous_path
+        if isdirectory(path . '/.hg/store')
+            return simplify(fnamemodify(path, ':p'))
         endif
-        let l:previous_path = l:path
-        let l:path = fnamemodify(l:path, ':h')
+        let previous_path = path
+        let path = fnamemodify(path, ':h')
     endwhile
     call s:throw("No Mercurial repository found above: " . a:path)
 endfunction
@@ -104,54 +105,54 @@ let s:HgRepo = {}
 
 " Constructor
 function! s:HgRepo.New(path) abort
-    let l:newRepo = copy(self)
-    let l:newRepo.root_dir = s:find_repo_root(a:path)
-    call s:trace("Built new Mercurial repository object at : " . l:newRepo.root_dir)
-    return l:newRepo
+    let newRepo = copy(self)
+    let newRepo.root_dir = s:find_repo_root(a:path)
+    call s:trace("Built new Mercurial repository object at : " . newRepo.root_dir)
+    return newRepo
 endfunction
 
 " Gets a full path given a repo-relative path
 function! s:HgRepo.GetFullPath(path) abort
-    let l:root_dir = self.root_dir
+    let root_dir = self.root_dir
     if a:path =~# '\v^[/\\]'
-        let l:root_dir = s:stripslash(l:root_dir)
+        let root_dir = s:stripslash(root_dir)
     endif
-    return l:root_dir . a:path
+    return root_dir . a:path
 endfunction
 
 " Gets a list of files matching a root-relative pattern.
 " If a flag is passed and is TRUE, a slash will be appended to all
 " directories.
 function! s:HgRepo.Glob(pattern, ...) abort
-    let l:root_dir = self.root_dir
+    let root_dir = self.root_dir
     if (a:pattern =~# '\v^[/\\]')
-        let l:root_dir = s:stripslash(l:root_dir)
+        let root_dir = s:stripslash(root_dir)
     endif
-    let l:matches = split(glob(l:root_dir . a:pattern), '\n')
+    let matches = split(glob(root_dir . a:pattern), '\n')
     if a:0 && a:1
-        for l:idx in range(len(l:matches))
-            if !filereadable(l:matches[l:idx])
-                let l:matches[l:idx] = l:matches[l:idx] . '/'
+        for idx in range(len(matches))
+            if !filereadable(matches[idx])
+                let matches[idx] = matches[idx] . '/'
             endif
         endfor
     endif
-    let l:strip_len = len(l:root_dir)
-    call map(l:matches, 'v:val[l:strip_len : -1]')
-    return l:matches
+    let strip_len = len(root_dir)
+    call map(matches, 'v:val[strip_len : -1]')
+    return matches
 endfunction
 
 " Runs a Mercurial command in the repo
 function! s:HgRepo.RunCommand(command, ...) abort
     " If there's only one argument, and it's a list, then use that as the
     " argument list.
-    let l:arg_list = a:000
+    let arg_list = a:000
     if a:0 == 1 && type(a:1) == type([])
-        let l:arg_list = a:1
+        let arg_list = a:1
     endif
-    let l:hg_command = g:lawrencium_hg_executable . ' --repository ' . shellescape(s:stripslash(self.root_dir))
-    let l:hg_command = l:hg_command . ' ' . a:command . ' ' . join(l:arg_list, ' ')
-    call s:trace("Running Mercurial command: " . l:hg_command)
-    return system(l:hg_command)
+    let hg_command = g:lawrencium_hg_executable . ' --repository ' . shellescape(s:stripslash(self.root_dir))
+    let hg_command = hg_command . ' ' . a:command . ' ' . join(arg_list, ' ')
+    call s:trace("Running Mercurial command: " . hg_command)
+    return system(hg_command)
 endfunction
 
 " Repo cache map
@@ -162,20 +163,20 @@ function! s:hg_repo(...) abort
     " Use the given path, or the mercurial directory of the current buffer.
     if a:0 == 0
         if exists('b:mercurial_dir')
-            let l:path = b:mercurial_dir
+            let path = b:mercurial_dir
         else
-            let l:path = s:find_repo_root(expand('%:p'))
+            let path = s:find_repo_root(expand('%:p'))
         endif
     else
-        let l:path = a:1
+        let path = a:1
     endif
     " Find a cache repo instance, or make a new one.
-    if has_key(s:buffer_repos, l:path)
-        return get(s:buffer_repos, l:path)
+    if has_key(s:buffer_repos, path)
+        return get(s:buffer_repos, path)
     else
-        let l:repo = s:HgRepo.New(l:path)
-        let s:buffer_repos[l:path] = l:repo
-        return l:repo
+        let repo = s:HgRepo.New(path)
+        let s:buffer_repos[path] = repo
+        return repo
     endif
 endfunction
 
@@ -183,21 +184,21 @@ endfunction
 " If the file is not in a Mercurial repo, just exit silently.
 function! s:setup_buffer_commands() abort
     call s:trace("Scanning buffer '" . bufname('%') . "' for Lawrencium setup...")
-    let l:do_setup = 1
+    let do_setup = 1
     if exists('b:mercurial_dir')
         if b:mercurial_dir =~# '\v^\s*$'
             unlet b:mercurial_dir
         else
-            let l:do_setup = 0
+            let do_setup = 0
         endif
     endif
     try
-        let l:repo = s:hg_repo()
+        let repo = s:hg_repo()
     catch /^lawrencium\:/
         return
     endtry
-    let b:mercurial_dir = l:repo.root_dir
-    if exists('b:mercurial_dir') && l:do_setup
+    let b:mercurial_dir = repo.root_dir
+    if exists('b:mercurial_dir') && do_setup
         call s:trace("Setting Mercurial commands for buffer '" . bufname('%'))
         call s:trace("  with repo : " . expand(b:mercurial_dir))
         silent doautocmd User Lawrencium
@@ -223,8 +224,8 @@ function! s:AddMainCommand(command) abort
 endfunction
 
 function! s:DefineMainCommands()
-    for l:command in s:main_commands
-        execute 'command! -buffer ' . l:command
+    for command in s:main_commands
+        execute 'command! -buffer ' . command
     endfor
 endfunction
 
@@ -235,40 +236,20 @@ augroup end
 
 " }}}
 
-" File format {{{
-
-function! s:FileRead()
-    let l = matchlist(expand('<amatch>'), '\vhg://(.*)//(.*)//(.*)')
-    let repo = l[1]
-    let rev = l[2]
-    let path = l[3]
-    " Delete the buffer that was errenously created because I'm not using
-    " FileReadCmd au properly
-    bd
-    call s:HgEdit(0, path, rev, repo)
-endfunction
-
-augroup lawrencium_files
-    autocmd!
-    autocmd BufReadCmd hg://** exe s:FileRead()
-augroup end
-
-" }}}
-
 " Commands Auto-Complete {{{
 
 " Auto-complete function for commands that take repo-relative file paths.
 function! s:ListRepoFiles(ArgLead, CmdLine, CursorPos) abort
-    let l:matches = s:hg_repo().Glob(a:ArgLead . '*', 1)
-    call map(l:matches, 's:normalizepath(v:val)')
-    return l:matches
+    let matches = s:hg_repo().Glob(a:ArgLead . '*', 1)
+    call map(matches, 's:normalizepath(v:val)')
+    return matches
 endfunction
 
 " Auto-complete function for commands that take repo-relative directory paths.
 function! s:ListRepoDirs(ArgLead, CmdLine, CursorPos) abort
-    let l:matches = s:hg_repo().Glob(a:ArgLead . '*/')
-    call map(l:matches, 's:normalizepath(v:val)')
-    return l:matches
+    let matches = s:hg_repo().Glob(a:ArgLead . '*/')
+    call map(matches, 's:normalizepath(v:val)')
+    return matches
 endfunction
 
 " }}}
@@ -276,17 +257,17 @@ endfunction
 " Hg {{{
 
 function! s:Hg(bang, ...) abort
-    let l:repo = s:hg_repo()
-    let l:output = call(l:repo.RunCommand, a:000, l:repo)
+    let repo = s:hg_repo()
+    let output = call(repo.RunCommand, a:000, repo)
     if a:bang
         " Open the output of the command in a temp file.
-        let l:temp_file = s:tempname('hg-output-', '.txt')
-        execute 'pedit ' . l:temp_file
+        let temp_file = s:tempname('hg-output-', '.txt')
+        execute 'pedit ' . temp_file
         wincmd p
-        call append(0, split(l:output, '\n'))
+        call append(0, split(output, '\n'))
     else
         " Just print out the output of the command.
-        echo l:output
+        echo output
     endif
 endfunction
 
@@ -306,39 +287,39 @@ function! s:CompleteHg(ArgLead, CmdLine, CursorPos)
 
     " a:ArgLead seems to be the number 0 when completing a minus '-'.
     " Gotta find out why...
-    let l:arglead = a:ArgLead
+    let arglead = a:ArgLead
     if type(a:ArgLead) == type(0)
-        let l:arglead = '-'
+        let arglead = '-'
     endif
 
     " Try completing a global option, before any command name.
     if a:CmdLine =~# '\v^Hg(\s+\-[a-zA-Z0-9\-_]*)+$'
-        return filter(copy(g:lawrencium_hg_options), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
+        return filter(copy(g:lawrencium_hg_options), "v:val[0:strlen(arglead)-1] ==# arglead")
     endif
 
     " Try completing a command (note that there could be global options before
     " the command name).
     if a:CmdLine =~# '\v^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*[a-zA-Z]+$'
         echom " - matched command"
-        return filter(keys(g:lawrencium_hg_commands), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
+        return filter(keys(g:lawrencium_hg_commands), "v:val[0:strlen(arglead)-1] ==# arglead")
     endif
 
     " Try completing a command's options.
-    let l:cmd = matchstr(a:CmdLine, '\v(^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*)@<=[a-zA-Z]+')
-    if strlen(l:cmd) > 0
-        echom " - matched command option for " . l:cmd . " with : " . l:arglead
+    let cmd = matchstr(a:CmdLine, '\v(^Hg\s+(\-[a-zA-Z0-9\-_]+\s+)*)@<=[a-zA-Z]+')
+    if strlen(cmd) > 0
+        echom " - matched command option for " . cmd . " with : " . arglead
     endif
-    if strlen(l:cmd) > 0 && l:arglead[0] ==# '-'
-        if has_key(g:lawrencium_hg_commands, l:cmd)
+    if strlen(cmd) > 0 && arglead[0] ==# '-'
+        if has_key(g:lawrencium_hg_commands, cmd)
             " Return both command options and global options together.
-            let l:copts = filter(copy(g:lawrencium_hg_commands[l:cmd]), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
-            let l:gopts = filter(copy(g:lawrencium_hg_options), "v:val[0:strlen(l:arglead)-1] ==# l:arglead")
-            return l:copts + l:gopts
+            let copts = filter(copy(g:lawrencium_hg_commands[cmd]), "v:val[0:strlen(arglead)-1] ==# arglead")
+            let gopts = filter(copy(g:lawrencium_hg_options), "v:val[0:strlen(arglead)-1] ==# arglead")
+            return copts + gopts
         endif
     endif
 
     " Just auto-complete with filenames unless it's an option.
-    if l:arglead[0] ==# '-'
+    if arglead[0] ==# '-'
         return []
     else
         return s:ListRepoFiles(a:ArgLead, a:CmdLine, a:CursorPos)
@@ -348,18 +329,18 @@ call s:AddMainCommand("-bang -complete=customlist,s:CompleteHg -nargs=* Hg :call
 
 " }}}
 
-" Hglog / Hglogstat {{{
+" Hglog {{{
 function! s:HgLog(...) abort
-    let l:repo = s:hg_repo()
-    let l:template = "'{rev}////{files}////{author}////{desc|strip}\n'"
+    let repo = s:hg_repo()
+    let template = "'{rev}////{files}////{author}////{desc|strip}\n'"
     if a:0
-        let l:log_text = l:repo.RunCommand('log', '--cwd', l:repo.root_dir, '--template', l:template, ' '.join(a:000))
+        let log_text = repo.RunCommand('log', '--cwd', repo.root_dir, '--template', template, ' '.join(a:000))
     else
-        let l:log_text = l:repo.RunCommand('log', '--template', l:template, expand('%'))
+        let log_text = repo.RunCommand('log', '--template', template, expand('%'))
     endif
 
     let list = []
-    for line in split(l:log_text, '\n')
+    for line in split(log_text, '\n')
         " Parse each log entry
         let ml = matchlist(line, '\v(.*)////(.*)////(.*)////(.*)')
         if len(ml) > 1
@@ -369,8 +350,8 @@ function! s:HgLog(...) abort
             let desc = ml[4]
             for file in files
                 " Format filename for quickfix list
-                let filename = 'hg://'.l:repo.root_dir.'//'.rev.'//'.file.' '
-                let text = author.' || '.desc
+                let filename = 'hg://'.s:stripslash(repo.root_dir).'//'.rev.'//'.file
+                let text = author.' '.desc
                 let entry = {'filename': filename, 'text': text}
                 let list += [entry]
             endfor
@@ -378,43 +359,73 @@ function! s:HgLog(...) abort
     endfor
     " replace quickfix list with new entries
     call setqflist(list,'r')
-    map <buffer> q :close<cr>
 endfunction
 
 call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglog :call s:HgLog(<f-args>)")
 
+function! s:FileRead()
+    let list = matchlist(expand('<amatch>'), '\vhg://(.*)//(.*)//(.*)')
+    let repo = s:hg_repo(list[1])
+    let rev  = list[2]
+    let path = list[3]
+    let ext = fnamemodify(path, ':e')
+
+    " Read file into buffer
+    exe '0r !hg --cwd '.repo.root_dir.' cat -r '.rev.' '.path
+
+    " Set read-only and delete buffer when hidden
+    set ro
+    setlocal bufhidden=delete noswapfile nobackup
+
+    " Set filetype since it doesn't seem to get set consistently
+    exe 'set ft='.ext
+
+    " Setup mercurial commands
+    let b:mercurial_dir = repo.root_dir
+    call s:DefineMainCommands()
+endfunction
+
+augroup lawrencium_files
+    au!
+    " Should be au FileReadCmd?
+    au BufReadCmd hg://**//[0-9]*//** exe s:FileRead()
+augroup end
+
+" }}}
+
+" Hglogstat {{{
 function! s:HgLogStat(...) abort
     " Get the repo
     " and the `hg log` output.
-    let l:repo = s:hg_repo()
+    let repo = s:hg_repo()
     if a:0
         if a:1 == '%'
             " Probably a better way to handle this
-            let l:log_text = l:repo.RunCommand('log', '--stat', expand('%'))
+            let log_text = repo.RunCommand('log', '--stat', expand('%'))
         else
-            let l:log_text = l:repo.RunCommand('log', '--stat', '--cwd', l:repo.root_dir, ' '.join(a:000))
+            let log_text = repo.RunCommand('log', '--stat', '--cwd', repo.root_dir, ' '.join(a:000))
         endif
     else
-        let l:log_text = l:repo.RunCommand('log', '--stat')
+        let log_text = repo.RunCommand('log', '--stat')
     endif
-    if l:log_text ==# '\v%^\s*%$'
+    if log_text ==# '\v%^\s*%$'
         echo "No log."
     endif
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg status` output in there.
-    let l:temp_file = s:tempname('hg-log-', '.txt')
-    let l:log_lines = split(l:log_text, '\n')
+    let temp_file = s:tempname('hg-log-', '.txt')
+    let log_lines = split(log_text, '\n')
     pclose
-    execute 'vsplit ' . fnameescape(l:temp_file)
+    execute 'vsplit ' . fnameescape(temp_file)
 
     setlocal previewwindow bufhidden=delete
-    call append(0, l:log_lines)
+    call append(0, log_lines)
     call cursor(1, 1)
 
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it.
-    let b:mercurial_dir = l:repo.root_dir
+    let b:mercurial_dir = repo.root_dir
     setlocal buftype=nofile
     setlocal syntax=hglog
 
@@ -438,49 +449,49 @@ call s:AddMainCommand("-nargs=? -complete=customlist,s:ListRepoFiles Hglogstat :
 
 function! s:HgLog_FileEdit() abort
     " Get changeset rev
-    let l:rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
+    let rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
 
     " Get the path of the file under the cursor, or files from changest we're in
-    let l:line = getline('.')
-    let l:path = matchstr(l:line, '\v(^\s)@<=[^|]*')
+    let line = getline('.')
+    let path = matchstr(line, '\v(^\s)@<=[^|]*')
 
-    if l:path == ''
+    if path == ''
         " Not on a path line, Edit all files in changeset
         " Get start/end offsets for curreng changeset
-        let l:start = line('.')
-        let l:end = search('^changeset:','nW') - 3
-        if l:end < 1
-            let l:end = line('$') - 3
+        let start = line('.')
+        let end = search('^changeset:','nW') - 3
+        if end < 1
+            let end = line('$') - 3
         endif
 
-        for line in range(l:start, l:end)
+        for line in range(start, end)
             " Try to match path
-            let l:path = matchstr(getline(l:line), '\v(^\s)@<=[^|]*')
-            if l:path != ''
-                call s:HgEdit(0, l:path, l:rev)
+            let path = matchstr(getline(line), '\v(^\s)@<=[^|]*')
+            if path != ''
+                call s:HgEdit(0, path, rev)
             endif
         endfor
     else
         " Edit file on current line
-        call s:HgEdit(0, l:path, l:rev)
+        call s:HgEdit(0, path, rev)
     endif
 endfunction
 
 function! s:HgLog_Diff() abort
-    let l:repo = s:hg_repo()
+    let repo = s:hg_repo()
 
     " Get the path of the file the cursor is on.
-    let l:line = getline('.')
-    let l:path = matchstr(l:line, '\v(^\s)@<=[^|]*')
+    let line = getline('.')
+    let path = matchstr(line, '\v(^\s)@<=[^|]*')
 
     " Get changeset rev
-    let l:rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
+    let rev = matchstr(getline(search('^changeset:', 'nb')), '\v(^changeset:\s+)@<=\d+')
 
-    call s:HgEdit(0, l:path, l:rev)
+    call s:HgEdit(0, path, rev)
     call s:HgDiff_DiffThis()
 
     " Remember the repo it belongs to.
-    let b:mercurial_dir = l:repo.root_dir
+    let b:mercurial_dir = repo.root_dir
     " Make sure it's deleted when we move away from it.
     " setlocal bufhidden=delete
     " Make commands available.
@@ -495,30 +506,30 @@ endfunction
 
 function! s:HgStatus() abort
     " Get the repo and the `hg status` output.
-    let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('status')
-    if l:status_text ==# '\v%^\s*%$'
+    let repo = s:hg_repo()
+    let status_text = repo.RunCommand('status')
+    if status_text ==# '\v%^\s*%$'
         echo "Nothing modified."
     endif
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg status` output in there.
-    let l:temp_file = s:tempname('hg-status-', '.txt')
-    let l:preview_height = &previewheight
-    let l:status_lines = split(l:status_text, '\n')
-    execute "setlocal previewheight=" . (len(l:status_lines) + 1)
-    execute "pedit " . l:temp_file
+    let temp_file = s:tempname('hg-status-', '.txt')
+    let preview_height = &previewheight
+    let status_lines = split(status_text, '\n')
+    execute "setlocal previewheight=" . (len(status_lines) + 1)
+    execute "pedit " . temp_file
     wincmd p
-    call append(0, l:status_lines)
+    call append(0, status_lines)
     call cursor(1, 1)
     " Make it a nice size.
-    execute "setlocal previewheight=" . l:preview_height
+    execute "setlocal previewheight=" . preview_height
     " Make sure it's deleted when we exit the window.
     setlocal bufhidden=delete
 
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it.
-    let b:mercurial_dir = l:repo.root_dir
+    let b:mercurial_dir = repo.root_dir
     setlocal buftype=nofile
     setlocal syntax=hgstatus
 
@@ -565,45 +576,45 @@ endfunction
 
 function! s:HgStatus_Refresh() abort
     " Get the repo and the `hg status` output.
-    let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('status')
+    let repo = s:hg_repo()
+    let status_text = repo.RunCommand('status')
 
     " Replace the contents of the current buffer with it, and refresh.
     echo "Writing to " . expand('%:p')
-    let l:path = expand('%:p')
-    let l:status_lines = split(l:status_text, '\n')
-    call writefile(l:status_lines, l:path)
+    let path = expand('%:p')
+    let status_lines = split(status_text, '\n')
+    call writefile(status_lines, path)
     edit
 endfunction
 
 function! s:HgStatus_FileEdit() abort
     " Get the path of the file the cursor is on.
-    let l:filename = s:HgStatus_GetSelectedFile()
+    let filename = s:HgStatus_GetSelectedFile()
 
     " If the file is already open in a window, jump to that window.
     " Otherwise, jump to the previous window and open it there.
     for nr in range(1, winnr('$'))
-        let l:br = winbufnr(nr)
-        let l:bpath = fnamemodify(bufname(l:br), ':p')
-        if l:bpath ==# l:filename
+        let br = winbufnr(nr)
+        let bpath = fnamemodify(bufname(br), ':p')
+        if bpath ==# filename
             execute nr . 'wincmd w'
             return
         endif
     endfor
     wincmd p
-    execute 'edit ' . l:filename
+    execute 'edit ' . filename
 endfunction
 
 function! s:HgStatus_AddRemove(linestart, lineend) abort
     " Get the selected filenames.
-    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['!', '?'])
-    if len(l:filenames) == 0
+    let filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['!', '?'])
+    if len(filenames) == 0
         call s:error("No files to add or remove in selection or current line.")
     endif
 
     " Run `addremove` on those paths.
-    let l:repo = s:hg_repo()
-    call l:repo.RunCommand('addremove', l:filenames)
+    let repo = s:hg_repo()
+    call repo.RunCommand('addremove', filenames)
 
     " Refresh the status window.
     call s:HgStatus_Refresh()
@@ -611,13 +622,13 @@ endfunction
 
 function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
     " Get the selected filenames.
-    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
-    if len(l:filenames) == 0
+    let filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(filenames) == 0
         call s:error("No files to commit in selection or file.")
     endif
 
     " Run `Hgcommit` on those paths.
-    call s:HgCommit(a:bang, a:vertical, l:filenames)
+    call s:HgCommit(a:bang, a:vertical, filenames)
 endfunction
 
 function! s:HgStatus_Diff(vertical) abort
@@ -627,38 +638,38 @@ function! s:HgStatus_Diff(vertical) abort
 endfunction
 
 function! s:HgStatus_GetSelectedFile() abort
-    let l:filenames = s:HgStatus_GetSelectedFiles()
-    return l:filenames[0]
+    let filenames = s:HgStatus_GetSelectedFiles()
+    return filenames[0]
 endfunction
 
 function! s:HgStatus_GetSelectedFiles(...) abort
     if a:0 >= 2
-        let l:lines = getline(a:1, a:2)
+        let lines = getline(a:1, a:2)
     else
-        let l:lines = []
-        call add(l:lines, getline('.'))
+        let lines = []
+        call add(lines, getline('.'))
     endif
-    let l:filenames = []
-    let l:repo = s:hg_repo()
-    for line in l:lines
+    let filenames = []
+    let repo = s:hg_repo()
+    for line in lines
         if a:0 >= 3
-            let l:status = s:HgStatus_GetFileStatus(line)
-            if index(a:3, l:status) < 0
+            let status = s:HgStatus_GetFileStatus(line)
+            if index(a:3, status) < 0
                 continue
             endif
         endif
         " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
         " look-aheads and look-behinds. See for yourself:
-        let l:filename = matchstr(l:line, '\v(^[MARC\!\?I ]\s)@<=.*')
-        let l:filename = l:repo.GetFullPath(l:filename)
-        call add(l:filenames, l:filename)
+        let filename = matchstr(line, '\v(^[MARC\!\?I ]\s)@<=.*')
+        let filename = repo.GetFullPath(filename)
+        call add(filenames, filename)
     endfor
-    return l:filenames
+    return filenames
 endfunction
 
 function! s:HgStatus_GetFileStatus(...) abort
-    let l:line = a:0 ? a:1 : getline('.')
-    return matchstr(l:line, '\v^[MARC\!\?I ]')
+    let line = a:0 ? a:1 : getline('.')
+    return matchstr(line, '\v^[MARC\!\?I ]')
 endfunction
 
 call s:AddMainCommand("Hgstatus :call s:HgStatus()")
@@ -677,46 +688,46 @@ call s:AddMainCommand("-bang -nargs=? -complete=customlist,s:ListRepoDirs Hglcd 
 function! s:HgEdit(bang, filename, ...) abort
     " Takes two optional arguments, revision and repo
     if a:bang
-        let l:cmd = 'edit! '
+        let cmd = 'edit! '
     else
-        let l:cmd = 'edit '
+        let cmd = 'edit '
     endif
 
     " Repo
     if a:0 && a:0 == 2
-        let l:repo = s:hg_repo(a:2)
+        let repo = s:hg_repo(a:2)
     else
-        let l:repo = s:hg_repo()
+        let repo = s:hg_repo()
     endif
-    let l:path = l:repo.GetFullPath(a:filename)
+    let path = repo.GetFullPath(a:filename)
 
     " Revision
     if a:0
-        let l:rev = a:1
+        let rev = a:1
 
         " Create temp file
-        let l:fn = '--' . fnamemodify(l:path, ':t')
-        let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev . l:fn
+        let fn = '--'.fnamemodify(path, ':t')
+        let temp_file = fnamemodify(tempname(), ':p:h').'/'.rev.fn
 
         " Edit revision of file
-        call l:repo.RunCommand('cat', '-r', l:rev, l:path, '-o', l:temp_file)
-        execute l:cmd . l:temp_file
-        let l:ext = fnamemodify(l:temp_file, ':e')
+        call repo.RunCommand('cat', '-r', rev, path, '-o', temp_file)
+        execute cmd . temp_file
+        let ext = fnamemodify(temp_file, ':e')
 
         " Set filetype since it doesn't seem to get triggered
-        exe 'set ft='.l:ext
+        exe 'set ft='.ext
         " Set read-only and delete when hidden
         set ro
         setlocal bufhidden=delete
     else
         " Editing file in cwd
-        let l:full_path = l:repo.GetFullPath(a:filename)
-        execute l:cmd . l:full_path
-        let l:ext = fnamemodify(l:full_path, ':e')
+        let full_path = repo.GetFullPath(a:filename)
+        execute cmd . full_path
+        let ext = fnamemodify(full_path, ':e')
     endif
 
     " Remember the repo it belongs to.
-    let b:mercurial_dir = l:repo.root_dir
+    let b:mercurial_dir = repo.root_dir
     " Make commands available.
     call s:DefineMainCommands()
 endfunction
@@ -728,30 +739,30 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgedi
 
 function! s:HgStatus() abort
     " Get the repo and the `hg status` output.
-    let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('status')
-    if l:status_text ==# '\v%^\s*%$'
+    let repo = s:hg_repo()
+    let status_text = repo.RunCommand('status')
+    if status_text ==# '\v%^\s*%$'
         echo "Nothing modified."
     endif
 
     " Open a new temp buffer in the preview window, jump to it,
     " and paste the `hg status` output in there.
-    let l:temp_file = s:tempname('hg-status-', '.txt')
-    let l:preview_height = &previewheight
-    let l:status_lines = split(l:status_text, '\n')
-    execute "setlocal previewheight=" . (len(l:status_lines) + 1)
-    execute "pedit " . l:temp_file
+    let temp_file = s:tempname('hg-status-', '.txt')
+    let preview_height = &previewheight
+    let status_lines = split(status_text, '\n')
+    execute "setlocal previewheight=" . (len(status_lines) + 1)
+    execute "pedit " . temp_file
     wincmd p
-    call append(0, l:status_lines)
+    call append(0, status_lines)
     call cursor(1, 1)
     " Make it a nice size.
-    execute "setlocal previewheight=" . l:preview_height
+    execute "setlocal previewheight=" . preview_height
     " Make sure it's deleted when we exit the window.
     setlocal bufhidden=delete
 
     " Setup the buffer correctly: readonly, and with the correct repo linked
     " to it.
-    let b:mercurial_dir = l:repo.root_dir
+    let b:mercurial_dir = repo.root_dir
     setlocal buftype=nofile
     setlocal syntax=hgstatus
 
@@ -798,45 +809,45 @@ endfunction
 
 function! s:HgStatus_Refresh() abort
     " Get the repo and the `hg status` output.
-    let l:repo = s:hg_repo()
-    let l:status_text = l:repo.RunCommand('status')
+    let repo = s:hg_repo()
+    let status_text = repo.RunCommand('status')
 
     " Replace the contents of the current buffer with it, and refresh.
     echo "Writing to " . expand('%:p')
-    let l:path = expand('%:p')
-    let l:status_lines = split(l:status_text, '\n')
-    call writefile(l:status_lines, l:path)
+    let path = expand('%:p')
+    let status_lines = split(status_text, '\n')
+    call writefile(status_lines, path)
     edit
 endfunction
 
 function! s:HgStatus_FileEdit() abort
     " Get the path of the file the cursor is on.
-    let l:filename = s:HgStatus_GetSelectedFile()
+    let filename = s:HgStatus_GetSelectedFile()
 
     " If the file is already open in a window, jump to that window.
     " Otherwise, jump to the previous window and open it there.
     for nr in range(1, winnr('$'))
-        let l:br = winbufnr(nr)
-        let l:bpath = fnamemodify(bufname(l:br), ':p')
-        if l:bpath ==# l:filename
+        let br = winbufnr(nr)
+        let bpath = fnamemodify(bufname(br), ':p')
+        if bpath ==# filename
             execute nr . 'wincmd w'
             return
         endif
     endfor
     wincmd p
-    execute 'edit ' . l:filename
+    execute 'edit ' . filename
 endfunction
 
 function! s:HgStatus_AddRemove(linestart, lineend) abort
     " Get the selected filenames.
-    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['!', '?'])
-    if len(l:filenames) == 0
+    let filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['!', '?'])
+    if len(filenames) == 0
         call s:error("No files to add or remove in selection or current line.")
     endif
 
     " Run `addremove` on those paths.
-    let l:repo = s:hg_repo()
-    call l:repo.RunCommand('addremove', l:filenames)
+    let repo = s:hg_repo()
+    call repo.RunCommand('addremove', filenames)
 
     " Refresh the status window.
     call s:HgStatus_Refresh()
@@ -844,13 +855,13 @@ endfunction
 
 function! s:HgStatus_Commit(linestart, lineend, bang, vertical) abort
     " Get the selected filenames.
-    let l:filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
-    if len(l:filenames) == 0
+    let filenames = s:HgStatus_GetSelectedFiles(a:linestart, a:lineend, ['M', 'A', 'R'])
+    if len(filenames) == 0
         call s:error("No files to commit in selection or file.")
     endif
 
     " Run `Hgcommit` on those paths.
-    call s:HgCommit(a:bang, a:vertical, l:filenames)
+    call s:HgCommit(a:bang, a:vertical, filenames)
 endfunction
 
 function! s:HgStatus_Diff(vertical) abort
@@ -860,38 +871,38 @@ function! s:HgStatus_Diff(vertical) abort
 endfunction
 
 function! s:HgStatus_GetSelectedFile() abort
-    let l:filenames = s:HgStatus_GetSelectedFiles()
-    return l:filenames[0]
+    let filenames = s:HgStatus_GetSelectedFiles()
+    return filenames[0]
 endfunction
 
 function! s:HgStatus_GetSelectedFiles(...) abort
     if a:0 >= 2
-        let l:lines = getline(a:1, a:2)
+        let lines = getline(a:1, a:2)
     else
-        let l:lines = []
-        call add(l:lines, getline('.'))
+        let lines = []
+        call add(lines, getline('.'))
     endif
-    let l:filenames = []
-    let l:repo = s:hg_repo()
-    for line in l:lines
+    let filenames = []
+    let repo = s:hg_repo()
+    for line in lines
         if a:0 >= 3
-            let l:status = s:HgStatus_GetFileStatus(line)
-            if index(a:3, l:status) < 0
+            let status = s:HgStatus_GetFileStatus(line)
+            if index(a:3, status) < 0
                 continue
             endif
         endif
         " Yay, awesome, Vim's regex syntax is fucked up like shit, especially for
         " look-aheads and look-behinds. See for yourself:
-        let l:filename = matchstr(l:line, '\v(^[MARC\!\?I ]\s)@<=.*')
-        let l:filename = l:repo.GetFullPath(l:filename)
-        call add(l:filenames, l:filename)
+        let filename = matchstr(line, '\v(^[MARC\!\?I ]\s)@<=.*')
+        let filename = repo.GetFullPath(filename)
+        call add(filenames, filename)
     endfor
-    return l:filenames
+    return filenames
 endfunction
 
 function! s:HgStatus_GetFileStatus(...) abort
-    let l:line = a:0 ? a:1 : getline('.')
-    return matchstr(l:line, '\v^[MARC\!\?I ]')
+    let line = a:0 ? a:1 : getline('.')
+    return matchstr(line, '\v^[MARC\!\?I ]')
 endfunction
 
 call s:AddMainCommand("Hgstatus :call s:HgStatus()")
@@ -911,47 +922,47 @@ function! s:HgDiff(filename, vertical, ...) abort
     " Default revisions to diff: the working directory (special Lawrencium
     " hard-coded syntax) and the parent of the working directory (using
     " Mercurial's revsets syntax).
-    let l:rev1 = 'lawrencium#_wdir_'
-    let l:rev2 = ''
+    let rev1 = 'lawrencium#_wdir_'
+    let rev2 = ''
     if a:0 == 1
-        let l:rev2 = a:1
+        let rev2 = a:1
     elseif a:0 == 2
-        let l:rev1 = a:1
-        let l:rev2 = a:2
+        let rev1 = a:1
+        let rev2 = a:2
     endif
 
     " Get the current repo, and expand the given filename in case it contains
     " fancy filename modifiers.
-    let l:repo = s:hg_repo()
-    let l:path = expand(a:filename)
-    call s:trace("Diff'ing '".l:rev1."' and '".l:rev2."' on file: ".l:path)
+    let repo = s:hg_repo()
+    let path = expand(a:filename)
+    call s:trace("Diff'ing '".rev1."' and '".rev2."' on file: ".path)
 
     " We'll keep a list of buffers in this diff, so when one exits, the
     " others' 'diff' flag is turned off.
-    let l:diff_buffers = []
+    let diff_buffers = []
 
     " Get the first file and open it.
-    if l:rev1 == 'lawrencium#_wdir_'
-        if bufexists(l:path)
-            execute 'buffer ' . fnameescape(l:path)
+    if rev1 == 'lawrencium#_wdir_'
+        if bufexists(path)
+            execute 'buffer ' . fnameescape(path)
         else
-            execute 'edit ' . fnameescape(l:path)
+            execute 'edit ' . fnameescape(path)
         endif
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
     else
         " Nice filenames
-        let l:fn = '--' . fnamemodify(l:path, ':t')
-        let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev1 . l:fn
+        let fn = '--' . fnamemodify(path, ':t')
+        let temp_file = fnamemodify(tempname(), ':p:h') . '/' . rev1 . fn
 
         " Use hg cat to create temporary copy of revision of file and edit
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev1.'"', l:path, '-o', l:temp_file)
-        execute 'edit ' . fnameescape(l:temp_file)
+        call repo.RunCommand('cat', '-r', '"'.rev1.'"', path, '-o', temp_file)
+        execute 'edit ' . fnameescape(temp_file)
 
         " Make it part of the diff group.
         call s:HgDiff_DiffThis()
         " Remember the repo it belongs to.
-        let b:mercurial_dir = l:repo.root_dir
+        let b:mercurial_dir = repo.root_dir
         " Make sure it's deleted when we move away from it.
         setlocal bufhidden=delete
         " Make commands available.
@@ -959,29 +970,29 @@ function! s:HgDiff(filename, vertical, ...) abort
     endif
 
     " Get the second file and open it too.
-    let l:diffsplit = 'diffsplit'
+    let diffsplit = 'diffsplit'
     if a:vertical
-        let l:diffsplit = 'vertical diffsplit'
+        let diffsplit = 'vertical diffsplit'
     endif
-    if l:rev2 == 'lawrencium#_wdir_'
-        execute l:diffsplit . ' ' . fnameescape(l:path)
+    if rev2 == 'lawrencium#_wdir_'
+        execute diffsplit . ' ' . fnameescape(path)
     else
         " Nice filenames
-        let l:fn = '--' . fnamemodify(l:path, ':t')
+        let fn = '--' . fnamemodify(path, ':t')
 
         " Get revision if we don't have it
-        if l:rev2 == ''
-            let l:fn = join(split(l:repo.RunCommand('id', '-r', '-1', '-n', '-b', '-t')), '-') . l:fn
+        if rev2 == ''
+            let fn = join(split(repo.RunCommand('id', '-r', '-1', '-n', '-b', '-t')), '-') . fn
         endif
 
-        let l:temp_file = fnamemodify(tempname(), ':p:h') . '/' . l:rev2 . l:fn
+        let temp_file = fnamemodify(tempname(), ':p:h') . '/' . rev2 . fn
 
         " Use hg cat to create temporary copy of revision of file and edit
-        call l:repo.RunCommand('cat', '-r', '"'.l:rev2.'"', l:path, '-o', l:temp_file)
-        execute l:diffsplit . ' ' . fnameescape(l:temp_file)
+        call repo.RunCommand('cat', '-r', '"'.rev2.'"', path, '-o', temp_file)
+        execute diffsplit . ' ' . fnameescape(temp_file)
 
         " Remember the repo it belongs to.
-        let b:mercurial_dir = l:repo.root_dir
+        let b:mercurial_dir = repo.root_dir
         " Make sure it's deleted when we move away from it.
         setlocal bufhidden=delete
         " Make commands available.
@@ -997,42 +1008,42 @@ function! s:HgDiff_DiffThis() abort
         call s:trace('Enabling diff mode on ' . bufname('%'))
         let w:lawrencium_diffoff = {}
         let w:lawrencium_diffoff['&diff'] = 0
-        let w:lawrencium_diffoff['&wrap'] = &l:wrap
-        let w:lawrencium_diffoff['&scrollopt'] = &l:scrollopt
-        let w:lawrencium_diffoff['&scrollbind'] = &l:scrollbind
-        let w:lawrencium_diffoff['&cursorbind'] = &l:cursorbind
-        let w:lawrencium_diffoff['&foldmethod'] = &l:foldmethod
-        let w:lawrencium_diffoff['&foldcolumn'] = &l:foldcolumn
+        let w:lawrencium_diffoff['&wrap'] = &wrap
+        let w:lawrencium_diffoff['&scrollopt'] = &scrollopt
+        let w:lawrencium_diffoff['&scrollbind'] = &scrollbind
+        let w:lawrencium_diffoff['&cursorbind'] = &cursorbind
+        let w:lawrencium_diffoff['&foldmethod'] = &foldmethod
+        let w:lawrencium_diffoff['&foldcolumn'] = &foldcolumn
         diffthis
     endif
 endfunction
 
 function! s:HgDiff_DiffOff(...) abort
     " Get the window name (given as a paramter, or current window).
-    let l:nr = a:0 ? a:1 : winnr()
+    let nr = a:0 ? a:1 : winnr()
 
     " Run the commands we saved in `HgDiff_DiffThis`, or just run `diffoff`.
-    let l:backup = getwinvar(l:nr, 'lawrencium_diffoff')
-    if type(l:backup) == type({}) && len(l:backup) > 0
-        call s:trace('Disabling diff mode on ' . l:nr)
-        for key in keys(l:backup)
-            call setwinvar(l:nr, key, l:backup[key])
+    let backup = getwinvar(nr, 'lawrencium_diffoff')
+    if type(backup) == type({}) && len(backup) > 0
+        call s:trace('Disabling diff mode on ' . nr)
+        for key in keys(backup)
+            call setwinvar(nr, key, backup[key])
         endfor
-        call setwinvar(l:nr, 'lawrencium_diffoff', {})
+        call setwinvar(nr, 'lawrencium_diffoff', {})
     else
-        call s:trace('Disabling diff mode on ' . l:nr . ' (but no true restore)')
+        call s:trace('Disabling diff mode on ' . nr . ' (but no true restore)')
         diffoff
     endif
 endfunction
 
 function! s:HgDiff_GetDiffWindows() abort
-    let l:result = []
+    let result = []
     for nr in range(1, winnr('$'))
         if getwinvar(nr, '&diff')
-            call add(l:result, nr)
+            call add(result, nr)
         endif
     endfor
-    return l:result
+    return result
 endfunction
 
 function! s:HgDiff_CleanUp() abort
@@ -1043,16 +1054,16 @@ function! s:HgDiff_CleanUp() abort
 
     " If there will be only one diff window left (plus the one we're leaving),
     " turn off diff everywhere.
-    let l:nrs = s:HgDiff_GetDiffWindows()
-    if len(l:nrs) <= 2
-        call s:trace('Disabling diff mode in ' . len(l:nrs) . ' windows.')
-        for nr in l:nrs
+    let nrs = s:HgDiff_GetDiffWindows()
+    if len(nrs) <= 2
+        call s:trace('Disabling diff mode in ' . len(nrs) . ' windows.')
+        for nr in nrs
             if getwinvar(nr, '&diff')
                 call s:HgDiff_DiffOff(nr)
             endif
         endfor
     else
-        call s:trace('Still ' . len(l:nrs) . ' diff windows open.')
+        call s:trace('Still ' . len(nrs) . ' diff windows open.')
     endif
 endfunction
 
@@ -1070,31 +1081,31 @@ call s:AddMainCommand("-nargs=* -complete=customlist,s:ListRepoFiles Hgvdiff :ca
 
 function! s:HgCommit(bang, vertical, ...) abort
     " Get the repo we'll be committing into.
-    let l:repo = s:hg_repo()
+    let repo = s:hg_repo()
 
     " Get the list of files to commit.
     " It can either be several files passed as extra parameters, or an
     " actual list passed as the first extra parameter.
-    let l:filenames = []
+    let filenames = []
     if a:0
-        let l:filenames = a:000
+        let filenames = a:000
         if a:0 == 1 && type(a:1) == type([])
-            let l:filenames = a:1
+            let filenames = a:1
         endif
     endif
 
     " Open a commit message file.
-    let l:commit_path = s:tempname('hg-editor-', '.txt')
-    let l:split = a:vertical ? 'vsplit' : 'split'
-    execute l:split . ' ' . l:commit_path
+    let commit_path = s:tempname('hg-editor-', '.txt')
+    let split = a:vertical ? 'vsplit' : 'split'
+    execute split . ' ' . commit_path
     call append(0, ['', ''])
-    call append(2, split(s:HgCommit_GenerateMessage(l:repo, l:filenames), '\n'))
+    call append(2, split(s:HgCommit_GenerateMessage(repo, filenames), '\n'))
     call cursor(1, 1)
 
     " Setup the auto-command that will actually commit on write/exit,
     " and make the buffer delete itself on exit.
-    let b:mercurial_dir = l:repo.root_dir
-    let b:lawrencium_commit_files = l:filenames
+    let b:mercurial_dir = repo.root_dir
+    let b:lawrencium_commit_files = filenames
     setlocal bufhidden=delete
     setlocal syntax=hgcommit
     if a:bang
@@ -1118,28 +1129,28 @@ let s:hg_status_messages = {
     \}
 
 function! s:HgCommit_GenerateMessage(repo, filenames) abort
-    let l:msg  = "HG: Enter commit message. Lines beginning with 'HG:' are removed.\n"
-    let l:msg .= "HG: Leave message empty to abort commit.\n"
-    let l:msg .= "HG: Write and quit buffer to proceed.\n"
-    let l:msg .= "HG: --\n"
-    let l:msg .= "HG: user: " . split(a:repo.RunCommand('showconfig ui.username'), '\n')[0] . "\n"
-    let l:msg .= "HG: branch '" . split(a:repo.RunCommand('branch'), '\n')[0] . "'\n"
+    let msg  = "HG: Enter commit message. Lines beginning with 'HG:' are removed.\n"
+    let msg .= "HG: Leave message empty to abort commit.\n"
+    let msg .= "HG: Write and quit buffer to proceed.\n"
+    let msg .= "HG: --\n"
+    let msg .= "HG: user: " . split(a:repo.RunCommand('showconfig ui.username'), '\n')[0] . "\n"
+    let msg .= "HG: branch '" . split(a:repo.RunCommand('branch'), '\n')[0] . "'\n"
 
     if len(a:filenames)
-        let l:status_lines = split(a:repo.RunCommand('status', a:filenames), "\n")
+        let status_lines = split(a:repo.RunCommand('status', a:filenames), "\n")
     else
-        let l:status_lines = split(a:repo.RunCommand('status'), "\n")
+        let status_lines = split(a:repo.RunCommand('status'), "\n")
     endif
-    for l:line in l:status_lines
-        if l:line ==# ''
+    for line in status_lines
+        if line ==# ''
             continue
         endif
-        let l:type = matchstr(l:line, '\v^[MARC\!\?I ]')
-        let l:path = l:line[2:]
-        let l:msg .= "HG: " . s:hg_status_messages[l:type] . ' ' . l:path . "\n"
+        let type = matchstr(line, '\v^[MARC\!\?I ]')
+        let path = line[2:]
+        let msg .= "HG: " . s:hg_status_messages[type] . ' ' . path . "\n"
     endfor
 
-    return l:msg
+    return msg
 endfunction
 
 function! s:HgCommit_Execute(log_file, show_output) abort
@@ -1154,23 +1165,23 @@ function! s:HgCommit_Execute(log_file, show_output) abort
     " Clean up all the 'HG:' lines from the commit message, and see if there's
     " any message left (Mercurial does this automatically, usually, but
     " apparently not when you feed it a log file...).
-    let l:lines = readfile(a:log_file)
-    call filter(l:lines, "v:val !~# '\\v^HG:'")
-    if len(filter(copy(l:lines), "v:val !~# '\\v^\\s*$'")) == 0
+    let lines = readfile(a:log_file)
+    call filter(lines, "v:val !~# '\\v^HG:'")
+    if len(filter(copy(lines), "v:val !~# '\\v^\\s*$'")) == 0
         call s:error("abort: Empty commit message")
         return
     endif
-    call writefile(l:lines, a:log_file)
+    call writefile(lines, a:log_file)
 
     " Get the repo and commit with the given message.
-    let l:repo = s:hg_repo()
-    let l:hg_args = ['-l', a:log_file]
-    call extend(l:hg_args, b:lawrencium_commit_files)
-    let l:output = l:repo.RunCommand('commit', l:hg_args)
-    if a:show_output && l:output !~# '\v%^\s*%$'
+    let repo = s:hg_repo()
+    let hg_args = ['-l', a:log_file]
+    call extend(hg_args, b:lawrencium_commit_files)
+    let output = repo.RunCommand('commit', hg_args)
+    if a:show_output && output !~# '\v%^\s*%$'
         call s:trace("Output from hg commit:", 1)
-        for l:output_line in split(l:output, '\n')
-            echom l:output_line
+        for output_line in split(output, '\n')
+            echom output_line
         endfor
     endif
 endfunction
@@ -1183,8 +1194,8 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvco
 " Hginit {{{
 
 function! s:HgInit() abort
-    let l:hg_command = g:lawrencium_hg_executable . ' init'
-    execute 'silent !' . l:hg_command | redraw!
+    let hg_command = g:lawrencium_hg_executable . ' init'
+    execute 'silent !' . hg_command | redraw!
     call s:setup_buffer_commands()
 endfunction
 
@@ -1200,14 +1211,14 @@ function! lawrencium#statusline(...)
     if !exists('b:mercurial_dir')
         return ''
     endif
-    let l:prefix = (a:0 > 0 ? a:1 : '')
-    let l:suffix = (a:0 > 1 ? a:2 : '')
-    let l:branch = 'default'
-    let l:branch_file = s:hg_repo().GetFullPath('.hg/branch')
-    if filereadable(l:branch_file)
-        let l:branch = readfile(l:branch_file)[0]
+    let prefix = (a:0 > 0 ? a:1 : '')
+    let suffix = (a:0 > 1 ? a:2 : '')
+    let branch = 'default'
+    let branch_file = s:hg_repo().GetFullPath('.hg/branch')
+    if filereadable(branch_file)
+        let branch = readfile(branch_file)[0]
     endif
-    return l:prefix . l:branch .  l:suffix
+    return prefix . branch . suffix
 endfunction
 
 " Rescans the current buffer for setting up Mercurial commands.
@@ -1217,12 +1228,12 @@ function! lawrencium#rescan(...)
         unlet b:mercurial_dir
     endif
     if a:0 && a:1
-        let l:trace_backup = g:lawrencium_trace
+        let trace_backup = g:lawrencium_trace
         let g:lawrencium_trace = 1
     endif
     call s:setup_buffer_commands()
     if a:0 && a:1
-        let g:lawrencium_trace = l:trace_backup
+        let g:lawrencium_trace = trace_backup
     endif
 endfunction
 
