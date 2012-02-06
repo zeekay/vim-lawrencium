@@ -376,9 +376,7 @@ function! s:FileRead()
     " Set read-only and delete buffer when hidden
     set ro
     setlocal bufhidden=delete noswapfile nobackup
-
-    " Set filetype since it doesn't seem to get set consistently
-    exe 'set ft='.ext
+    exe 'filetype detect'
 
     " Setup mercurial commands
     let b:mercurial_dir = repo.root_dir
