@@ -1171,6 +1171,29 @@ call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgvco
 
 " }}}
 
+" Hgrevert {{{
+
+function! s:HgRevert(bang, ...) abort
+    " Get the files to revert.
+    let filenames = a:000
+    if a:0 == 0
+        let filenames = [ expand('%:p') ]
+    endif
+    if a:bang
+        call insert(filenames, '--no-backup', 0)
+    endif
+
+    " Get the repo.
+    let repo = s:hg_repo()
+
+    " Run the command.
+    call repo.RunCommand('revert', filenames)
+endfunction
+
+call s:AddMainCommand("-bang -nargs=* -complete=customlist,s:ListRepoFiles Hgrevert :call s:HgRevert(<bang>0, <f-args>)")
+
+" }}}
+
 " Hginit {{{
 
 function! s:HgInit() abort
